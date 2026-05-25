@@ -27,7 +27,7 @@ export function SettingsPage() {
               </FormControl>
               <FormControl>
                 <FormLabel>Base URL QR Code</FormLabel>
-                <Input defaultValue={import.meta.env.VITE_PUBLIC_ORDER_BASE_URL ?? `${window.location.origin}/menu`} />
+                <Input defaultValue={`${window.location.origin}/mesa`} />
               </FormControl>
             </VStack>
           </CardBody>

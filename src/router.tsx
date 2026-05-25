@@ -30,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'configuracoes', element: <SettingsPage /> }
     ]
   },
+  { path: '/mesa/:tableId', element: <PublicMenuPage /> },
   { path: '/menu/:tableId', element: <PublicMenuPage /> },
   { path: '*', element: <Navigate to="/admin" replace /> }
 ]);

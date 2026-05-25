@@ -70,7 +70,7 @@ export function TablesPage() {
   const modal = useDisclosure();
   const qrModal = useDisclosure();
   const toast = useToast();
-  const publicBase = import.meta.env.VITE_PUBLIC_ORDER_BASE_URL ?? `${window.location.origin}/menu`;
+  const publicBase = `${window.location.origin}/mesa`;
 
   function saveTable() {
     if (!draft.name.trim()) return toast({ title: 'Nome da mesa obrigatorio', status: 'warning' });

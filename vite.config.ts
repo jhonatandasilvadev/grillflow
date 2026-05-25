@@ -7,6 +7,7 @@ export default defineConfig({
     port: 5173
   },
   build: {
+    chunkSizeWarningLimit: 650,
     rollupOptions: {
       output: {
         manualChunks: {

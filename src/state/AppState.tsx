@@ -9,6 +9,7 @@ import {
   tables as initialTables
 } from '../data/mockData';
 import type {
+  AppNotification,
   CashEntry,
   Category,
   Customer,
@@ -32,6 +33,7 @@ interface AppData {
   tabs: TabAccount[];
   inventoryMovements: InventoryMovement[];
   cashOpen: boolean;
+  notifications: AppNotification[];
 }
 
 interface AppState extends AppData {
@@ -44,10 +46,11 @@ interface AppState extends AppData {
   setTabs: (items: TabAccount[]) => void;
   setInventoryMovements: (items: InventoryMovement[]) => void;
   setCashOpen: (open: boolean) => void;
+  setNotifications: (items: AppNotification[]) => void;
   resetDemoData: () => void;
 }
 
-const STORAGE_KEY = 'grillflow.app-state.v1';
+export const STORAGE_KEY = 'grillflow.app-state.v1';
 
 const initialTabs: TabAccount[] = [
   {
@@ -84,7 +87,8 @@ const initialData: AppData = {
   customers: initialCustomers,
   tabs: initialTabs,
   inventoryMovements: [],
-  cashOpen: true
+  cashOpen: true,
+  notifications: []
 };
 
 const AppStateContext = createContext<AppState | null>(null);
@@ -134,6 +138,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setInventoryMovements: (inventoryMovements) =>
         setData((current) => ({ ...current, inventoryMovements })),
       setCashOpen: (cashOpen) => setData((current) => ({ ...current, cashOpen })),
+      setNotifications: (notifications) => setData((current) => ({ ...current, notifications })),
       resetDemoData: () => setData(initialData)
     }),
     [data]

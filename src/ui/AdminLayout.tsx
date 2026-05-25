@@ -14,6 +14,12 @@ import {
   Drawer,
   DrawerContent,
   DrawerOverlay,
+  Badge,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverBody,
+  Divider,
   VStack
 } from '@chakra-ui/react';
 import {
@@ -28,9 +34,15 @@ import {
   Settings,
   Table2,
   Users,
-  Utensils
+  Utensils,
+  Bell
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { isQrOrder, playOrderAlert, SOUND_ENABLED_KEY } from '../lib/adminAlerts';
+import { STORAGE_KEY, useAppState } from '../state/AppState';
+import type { AppNotification, Order } from '../types';
 
 const navItems: Array<{ label: string; href: string; icon: LucideIcon }> = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -91,6 +103,67 @@ export function AdminLayout() {
   const { setColorMode } = useColorMode();
   const toast = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { orders, setOrders, notifications, setNotifications } = useAppState();
+  const [soundEnabled, setSoundEnabled] = useState(localStorage.getItem(SOUND_ENABLED_KEY) === 'true');
+  const notifiedOrders = useRef(new Set(notifications.map((notification) => notification.orderId)));
+  const unread = notifications.filter((notification) => notification.status === 'unread');
+
+  const qrOrders = useMemo(() => orders.filter(isQrOrder), [orders]);
+
+  const registerNewOrder = useCallback((order: Order) => {
+    if (notifiedOrders.current.has(order.id)) return;
+    notifiedOrders.current.add(order.id);
+    const notification: AppNotification = {
+      id: `notification-${order.id}`,
+      orderId: order.id,
+      table: order.table,
+      customer: order.customerName ?? order.customer,
+      createdAt: order.createdAt,
+      status: 'unread'
+    };
+    setNotifications([notification, ...notifications]);
+    toast({
+      title: 'Novo pedido recebido',
+      description: `${order.table} - Cliente: ${order.customerName ?? order.customer}`,
+      status: 'info',
+      duration: 6000,
+      isClosable: true
+    });
+    if (soundEnabled) playOrderAlert();
+  }, [notifications, setNotifications, soundEnabled, toast]);
+
+  useEffect(() => {
+    qrOrders.forEach(registerNewOrder);
+  }, [qrOrders, registerNewOrder]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+        const parsed = JSON.parse(stored) as { orders?: Order[] };
+        if (parsed.orders && parsed.orders.length !== orders.length) {
+          setOrders(parsed.orders);
+        }
+        parsed.orders?.filter(isQrOrder).forEach(registerNewOrder);
+      } catch (error) {
+        console.error('Erro ao consultar pedidos novos no localStorage', error);
+      }
+    }, 3000);
+    return () => window.clearInterval(interval);
+  }, [orders.length, registerNewOrder, setOrders]);
+
+  function enableSound() {
+    localStorage.setItem(SOUND_ENABLED_KEY, 'true');
+    setSoundEnabled(true);
+    playOrderAlert();
+    toast({ title: 'Alertas sonoros ativados', status: 'success' });
+  }
+
+  function markAllRead() {
+    setNotifications(notifications.map((notification) => ({ ...notification, status: 'read' })));
+  }
 
   return (
     <Flex minH="100vh">
@@ -145,6 +218,43 @@ export function AdminLayout() {
             </Box>
           </HStack>
           <HStack>
+            <Popover placement="bottom-end">
+              <PopoverTrigger>
+                <Box position="relative">
+                  <IconButton aria-label="Notificacoes" icon={<Bell />} variant="ghost" onClick={markAllRead} />
+                  {unread.length > 0 ? (
+                    <Badge position="absolute" top="-1" right="-1" colorScheme="red" borderRadius="999px">
+                      {unread.length}
+                    </Badge>
+                  ) : null}
+                </Box>
+              </PopoverTrigger>
+              <PopoverContent bg="brand.panel" borderColor="whiteAlpha.200" w="320px">
+                <PopoverBody>
+                  <HStack justify="space-between" mb={3}>
+                    <Text fontWeight={900}>Notificacoes</Text>
+                    <Button size="xs" variant="ghost" onClick={soundEnabled ? () => { localStorage.setItem(SOUND_ENABLED_KEY, 'false'); setSoundEnabled(false); } : enableSound}>
+                      {soundEnabled ? 'Som ativo' : 'Ativar alertas sonoros'}
+                    </Button>
+                  </HStack>
+                  <Divider borderColor="whiteAlpha.200" mb={3} />
+                  <VStack align="stretch" spacing={2}>
+                    {notifications.length === 0 ? (
+                      <Text color="whiteAlpha.600" fontSize="sm">Nenhum pedido novo.</Text>
+                    ) : notifications.slice(0, 8).map((notification) => (
+                      <Box key={notification.id} p={3} borderRadius="12px" bg={notification.status === 'unread' ? 'whiteAlpha.200' : 'whiteAlpha.100'}>
+                        <Text fontWeight={900}>Novo pedido recebido</Text>
+                        <Text color="whiteAlpha.700" fontSize="sm">{notification.table} - Cliente: {notification.customer}</Text>
+                        <HStack justify="space-between" mt={2}>
+                          <Text color="whiteAlpha.500" fontSize="xs">{notification.createdAt}</Text>
+                          <Button size="xs" onClick={() => navigate('/admin/pedidos')}>Ver pedido</Button>
+                        </HStack>
+                      </Box>
+                    ))}
+                  </VStack>
+                </PopoverBody>
+              </PopoverContent>
+            </Popover>
             <Text display={{ base: 'none', md: 'block' }} color="whiteAlpha.600" fontSize="sm">
               {location.pathname}
             </Text>

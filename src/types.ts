@@ -36,13 +36,19 @@ export interface Product {
 export interface Order {
   id: string;
   number: string;
+  commandId?: string;
+  tableId?: string;
   table: string;
   customer: string;
+  customerName?: string;
   createdAt: string;
+  updatedAt?: string;
   status: OrderStatus;
   priority: 'normal' | 'alta';
   total: number;
   items: Array<{ name: string; qty: number; notes?: string }>;
+  observation?: string;
+  source?: 'admin' | 'qr';
 }
 
 export interface InventoryItem {
@@ -77,12 +83,17 @@ export interface TabAccount {
   id: string;
   tableId: string;
   customer: string;
+  customerName?: string;
+  customerCpf?: string;
   status: 'aberta' | 'pagamento' | 'fechada';
   orderIds: string[];
   discount: number;
   serviceTax: number;
   paymentMethod: PaymentMethod;
   createdAt: string;
+  openedAt?: string;
+  closedAt?: string;
+  total?: number;
 }
 
 export interface InventoryMovement {
@@ -92,4 +103,13 @@ export interface InventoryMovement {
   quantity: number;
   note: string;
   time: string;
+}
+
+export interface AppNotification {
+  id: string;
+  orderId: string;
+  table: string;
+  customer: string;
+  createdAt: string;
+  status: 'unread' | 'read';
 }
