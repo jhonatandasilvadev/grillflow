@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 18% -10%, rgba(255, 107, 26, .26), transparent 32rem),
+    radial-gradient(circle at 88% 12%, rgba(73, 198, 229, .16), transparent 26rem),
+    #080b10;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a3545;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b1017;
+}
