@@ -108,7 +108,7 @@ function loadData(): AppData {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return initialData;
     const parsed = { ...initialData, ...JSON.parse(stored) } as AppData;
-    return { ...parsed, tables: normalizeTables(parsed.tables) };
+    return { ...parsed, tables: mergeDefaultTables(parsed.tables) };
   } catch (error) {
     console.error('Erro ao carregar dados locais do GrillFlow', error);
     return initialData;
@@ -126,6 +126,23 @@ function normalizeTables(tables: RestaurantTable[]) {
   }));
 }
 
+function mergeDefaultTables(tables: RestaurantTable[]) {
+  const defaultTables = normalizeTables(initialTables);
+  const defaultIds = new Set(defaultTables.map((table) => table.id));
+  const defaultTokens = new Set(defaultTables.map((table) => table.qrToken));
+  const existingTables = normalizeTables(tables).filter((table) => {
+    const legacyDemoTable = table.qrToken?.startsWith('mesa-demo-') && defaultIds.has(table.id);
+    return !legacyDemoTable;
+  });
+  const customTables = existingTables.filter((table) => !defaultIds.has(table.id) && !defaultTokens.has(table.qrToken));
+  const defaultsWithLocalEdits = defaultTables.map((defaultTable) => {
+    const storedTable = existingTables.find((table) => table.id === defaultTable.id || table.qrToken === defaultTable.qrToken);
+    return storedTable ? { ...storedTable, qrToken: defaultTable.qrToken } : defaultTable;
+  });
+
+  return normalizeTables([...defaultsWithLocalEdits, ...customTables]);
+}
+
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(loadData);
 
@@ -137,14 +154,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (!active || !remoteTables) return;
 
       if (remoteTables.length > 0) {
+        const mergedTables = mergeDefaultTables(remoteTables);
         const remoteTokens = new Set(remoteTables.map((table) => table.qrToken));
         const missingDefaultTables = normalizeTables(initialTables).filter((table) => !remoteTokens.has(table.qrToken));
-        setData((current) => ({ ...current, tables: normalizeTables([...remoteTables, ...missingDefaultTables]) }));
+        setData((current) => ({ ...current, tables: mergedTables }));
         await Promise.all(missingDefaultTables.map((table) => saveTableToSupabase(table)));
         return;
       }
 
-      const localTables = normalizeTables(loadData().tables);
+      const localTables = mergeDefaultTables(loadData().tables);
       await Promise.all(localTables.map((table) => saveTableToSupabase(table)));
     }
 
