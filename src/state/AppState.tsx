@@ -139,9 +139,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (remoteTables.length > 0) {
         const remoteTokens = new Set(remoteTables.map((table) => table.qrToken));
         const missingDefaultTables = normalizeTables(initialTables).filter((table) => !remoteTokens.has(table.qrToken));
-        const createdTables = await Promise.all(missingDefaultTables.map((table) => saveTableToSupabase(table)));
-        const validCreatedTables = createdTables.filter((table): table is RestaurantTable => Boolean(table));
-        setData((current) => ({ ...current, tables: normalizeTables([...remoteTables, ...validCreatedTables]) }));
+        setData((current) => ({ ...current, tables: normalizeTables([...remoteTables, ...missingDefaultTables]) }));
+        await Promise.all(missingDefaultTables.map((table) => saveTableToSupabase(table)));
         return;
       }
 
