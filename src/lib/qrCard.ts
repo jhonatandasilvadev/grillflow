@@ -23,8 +23,13 @@ export function tableQrSlug(table: RestaurantTable) {
   return table.qrToken;
 }
 
+export function normalizePublicOrderBaseUrl(publicBase: string) {
+  const cleanBase = publicBase.replace(/\/$/, '');
+  return /\/(mesa|menu)$/i.test(cleanBase) ? cleanBase : `${cleanBase}/mesa`;
+}
+
 export function tableQrUrl(table: RestaurantTable, publicBase: string) {
-  return `${publicBase.replace(/\/$/, '')}/${table.qrToken}`;
+  return `${normalizePublicOrderBaseUrl(publicBase)}/${table.qrToken}`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

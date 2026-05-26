@@ -37,12 +37,31 @@ function isValidCpf(value: string) {
   return onlyDigits(value).length === 11;
 }
 
+function tableNumberFromLegacyToken(value?: string) {
+  const match = value?.trim().match(/^(?:mesa(?:-demo)?[\s_-]*)(\d+)$/i);
+  return match ? String(Number(match[1])) : null;
+}
+
+function findLocalTable(tables: RestaurantTable[], tableId?: string) {
+  const legacyNumber = tableNumberFromLegacyToken(tableId);
+
+  return tables.find((item) => {
+    const itemNumber = tableNumberFromLegacyToken(item.name);
+    return (
+      item.qrToken === tableId ||
+      item.id === tableId ||
+      tableQrSlug(item) === tableId ||
+      Boolean(legacyNumber && (item.id === legacyNumber || itemNumber === legacyNumber))
+    );
+  });
+}
+
 export function PublicMenuPage() {
   const { tableId } = useParams();
   const { products, orders, setOrders, tables, tabs, setTabs, setTables, settings } = useAppState();
   const [remoteTable, setRemoteTable] = useState<RestaurantTable | null>(null);
   const [loadingTable, setLoadingTable] = useState(true);
-  const localTable = tables.find((item) => item.qrToken === tableId || item.id === tableId || tableQrSlug(item) === tableId);
+  const localTable = findLocalTable(tables, tableId);
   const table = remoteTable ?? localTable ?? null;
   const sessionKey = `grillflow.public-command.${table ? tableQrSlug(table) : tableId}`;
   const storedCommandId = localStorage.getItem(sessionKey);
