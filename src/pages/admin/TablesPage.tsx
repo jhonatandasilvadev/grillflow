@@ -67,7 +67,7 @@ function emptyTable(): RestaurantTable {
 
 function tableAvailability(table: RestaurantTable) {
   if (table.archived) return { label: 'Arquivada', colorScheme: 'gray' };
-  if (!table.active) return { label: 'Inativa', colorScheme: 'red' };
+  if (!table.active) return { label: 'Desativada', colorScheme: 'red' };
   return { label: 'Ativa', colorScheme: 'green' };
 }
 
@@ -310,7 +310,15 @@ export function TablesPage() {
                 </HStack>
                 <HStack mt={4} flexWrap="wrap">
                   <Button size="sm" variant="ghost" onClick={() => openTab(table)}>Abrir comanda</Button>
-                  <Button size="sm" variant="ghost" leftIcon={table.active ? <PowerOff size={15} /> : <Power size={15} />} onClick={() => toggleTableActive(table)}>{table.active ? 'Desativar' : 'Ativar'}</Button>
+                  <Button
+                    size="sm"
+                    colorScheme={table.active && !table.archived ? 'green' : 'red'}
+                    variant="solid"
+                    leftIcon={table.active && !table.archived ? <Power size={15} /> : <PowerOff size={15} />}
+                    onClick={() => toggleTableActive(table)}
+                  >
+                    {table.active && !table.archived ? 'Ativa' : 'Desativada'}
+                  </Button>
                   <Button size="sm" variant="ghost" leftIcon={<Eye size={15} />} onClick={() => previewQr(table)}>Visualizar QR</Button>
                   <Button size="sm" variant="ghost" leftIcon={<Download size={15} />} onClick={() => downloadOne(table)}>Baixar QR</Button>
                   <Button size="sm" variant="ghost" leftIcon={<Copy size={15} />} onClick={() => copyLink(table)}>Copiar link</Button>

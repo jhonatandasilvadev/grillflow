@@ -9,12 +9,18 @@ import type {
 } from '../types';
 
 export const tables: RestaurantTable[] = [
-  { id: '1', name: 'Mesa 01', seats: 2, status: 'ocupada', active: true, archived: false, billTotal: 128.7, tabs: 2, x: 12, y: 18, qrToken: 'mesa-demo-01' },
-  { id: '2', name: 'Mesa 02', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 42, y: 14, qrToken: 'mesa-demo-02' },
-  { id: '3', name: 'Mesa 03', seats: 4, status: 'pagamento', active: true, archived: false, billTotal: 221.9, tabs: 3, x: 70, y: 20, qrToken: 'mesa-demo-03' },
-  { id: '4', name: 'Mesa 04', seats: 6, status: 'reservada', active: true, archived: false, billTotal: 0, tabs: 0, x: 18, y: 52, qrToken: 'mesa-demo-04' },
-  { id: '5', name: 'Mesa 05', seats: 2, status: 'ocupada', active: true, archived: false, billTotal: 78.4, tabs: 1, x: 48, y: 58, qrToken: 'mesa-demo-05' },
-  { id: '6', name: 'Mesa 06', seats: 8, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 77, y: 62, qrToken: 'mesa-demo-06' }
+  { id: '1', name: 'Mesa 01', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 14, y: 18, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000001' },
+  { id: '2', name: 'Mesa 02', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 34, y: 18, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000002' },
+  { id: '3', name: 'Mesa 03', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 54, y: 18, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000003' },
+  { id: '4', name: 'Mesa 04', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 74, y: 18, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000004' },
+  { id: '5', name: 'Mesa 05', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 14, y: 44, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000005' },
+  { id: '6', name: 'Mesa 06', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 34, y: 44, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000006' },
+  { id: '7', name: 'Mesa 07', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 54, y: 44, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000007' },
+  { id: '8', name: 'Mesa 08', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 74, y: 44, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000008' },
+  { id: '9', name: 'Mesa 09', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 14, y: 70, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000009' },
+  { id: '10', name: 'Mesa 10', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 34, y: 70, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000010' },
+  { id: '11', name: 'Mesa 11', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 54, y: 70, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000011' },
+  { id: '12', name: 'Mesa 12', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 74, y: 70, width: 150, height: 116, qrToken: 'a8f72d9e1cf5a6b00000000000000012' }
 ];
 
 export const categories: Category[] = [

@@ -161,3 +161,19 @@ alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.order_items;
 alter publication supabase_realtime add table public.inventory;
 alter publication supabase_realtime add table public.cash_flow;
+
+insert into public.tables (name, seats, status, qr_token, active, archived, position_x, position_y, width, height)
+values
+  ('Mesa 01', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000001', true, false, 14, 18, 150, 116),
+  ('Mesa 02', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000002', true, false, 34, 18, 150, 116),
+  ('Mesa 03', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000003', true, false, 54, 18, 150, 116),
+  ('Mesa 04', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000004', true, false, 74, 18, 150, 116),
+  ('Mesa 05', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000005', true, false, 14, 44, 150, 116),
+  ('Mesa 06', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000006', true, false, 34, 44, 150, 116),
+  ('Mesa 07', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000007', true, false, 54, 44, 150, 116),
+  ('Mesa 08', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000008', true, false, 74, 44, 150, 116),
+  ('Mesa 09', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000009', true, false, 14, 70, 150, 116),
+  ('Mesa 10', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000010', true, false, 34, 70, 150, 116),
+  ('Mesa 11', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000011', true, false, 54, 70, 150, 116),
+  ('Mesa 12', 4, 'livre', 'a8f72d9e1cf5a6b00000000000000012', true, false, 74, 70, 150, 116)
+on conflict (qr_token) do nothing;
