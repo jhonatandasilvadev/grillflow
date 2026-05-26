@@ -98,6 +98,10 @@ function alignTablesToGrid(tables: RestaurantTable[]) {
   return tables.map((table, index) => ({ ...table, ...gridPosition(index), width: 150, height: 116 }));
 }
 
+function sortTablesByName(tables: RestaurantTable[]) {
+  return [...tables].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { numeric: true }));
+}
+
 export function TablesPage() {
   const { tables, setTables, tabs, setTabs, settings } = useAppState();
   const [draft, setDraft] = useState<RestaurantTable>(emptyTable);
@@ -125,6 +129,7 @@ export function TablesPage() {
       }),
     [tables, availabilityFilter, statusFilter]
   );
+  const visibleTablesByName = useMemo(() => sortTablesByName(visibleTables), [visibleTables]);
 
   async function persistTable(table: RestaurantTable) {
     return (await saveTableToSupabase(table)) ?? table;
@@ -383,7 +388,7 @@ export function TablesPage() {
         <SimpleGrid columns={{ base: 1, md: 2, xl: 1 }} spacing={4}>
           {visibleTables.length === 0 ? (
             <Card><CardBody><Text color="whiteAlpha.700">Nenhuma mesa cadastrada.</Text></CardBody></Card>
-          ) : visibleTables.map((table) => (
+          ) : visibleTablesByName.map((table) => (
             <Card key={table.id}>
               <CardBody>
                 <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap={3}>
