@@ -9,12 +9,12 @@ import type {
 } from '../types';
 
 export const tables: RestaurantTable[] = [
-  { id: '1', name: 'Mesa 01', seats: 2, status: 'ocupada', billTotal: 128.7, tabs: 2, x: 12, y: 18 },
-  { id: '2', name: 'Mesa 02', seats: 4, status: 'livre', billTotal: 0, tabs: 0, x: 42, y: 14 },
-  { id: '3', name: 'Mesa 03', seats: 4, status: 'pagamento', billTotal: 221.9, tabs: 3, x: 70, y: 20 },
-  { id: '4', name: 'Mesa 04', seats: 6, status: 'reservada', billTotal: 0, tabs: 0, x: 18, y: 52 },
-  { id: '5', name: 'Mesa 05', seats: 2, status: 'ocupada', billTotal: 78.4, tabs: 1, x: 48, y: 58 },
-  { id: '6', name: 'Mesa 06', seats: 8, status: 'livre', billTotal: 0, tabs: 0, x: 77, y: 62 }
+  { id: '1', name: 'Mesa 01', seats: 2, status: 'ocupada', active: true, archived: false, billTotal: 128.7, tabs: 2, x: 12, y: 18, qrToken: 'mesa-demo-01' },
+  { id: '2', name: 'Mesa 02', seats: 4, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 42, y: 14, qrToken: 'mesa-demo-02' },
+  { id: '3', name: 'Mesa 03', seats: 4, status: 'pagamento', active: true, archived: false, billTotal: 221.9, tabs: 3, x: 70, y: 20, qrToken: 'mesa-demo-03' },
+  { id: '4', name: 'Mesa 04', seats: 6, status: 'reservada', active: true, archived: false, billTotal: 0, tabs: 0, x: 18, y: 52, qrToken: 'mesa-demo-04' },
+  { id: '5', name: 'Mesa 05', seats: 2, status: 'ocupada', active: true, archived: false, billTotal: 78.4, tabs: 1, x: 48, y: 58, qrToken: 'mesa-demo-05' },
+  { id: '6', name: 'Mesa 06', seats: 8, status: 'livre', active: true, archived: false, billTotal: 0, tabs: 0, x: 77, y: 62, qrToken: 'mesa-demo-06' }
 ];
 
 export const categories: Category[] = [

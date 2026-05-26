@@ -7,12 +7,15 @@ export interface RestaurantTable {
   name: string;
   seats: number;
   status: TableStatus;
+  active: boolean;
+  archived: boolean;
   billTotal: number;
   tabs: number;
   x: number;
   y: number;
   width?: number;
   height?: number;
+  qrToken: string;
   qrSlug?: string;
 }
 

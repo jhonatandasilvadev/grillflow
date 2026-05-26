@@ -2,6 +2,12 @@ import QRCode from 'qrcode';
 import jsPDF from 'jspdf';
 import type { RestaurantTable } from '../types';
 
+export function createQrToken() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export function slugifyTable(name: string, fallback: string) {
   const slug = name
     .normalize('NFD')
@@ -14,13 +20,11 @@ export function slugifyTable(name: string, fallback: string) {
 }
 
 export function tableQrSlug(table: RestaurantTable) {
-  return table.qrSlug ?? slugifyTable(table.name, table.id);
+  return table.qrToken;
 }
 
 export function tableQrUrl(table: RestaurantTable, publicBase: string) {
-  const url = `${publicBase.replace(/\/$/, '')}/${tableQrSlug(table)}`;
-  const separator = url.includes('?') ? '&' : '?';
-  return `${url}${separator}mesa=${encodeURIComponent(table.name)}`;
+  return `${publicBase.replace(/\/$/, '')}/${table.qrToken}`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -92,8 +96,8 @@ export async function createQrCardDataUrl(table: RestaurantTable, publicBase: st
 
   ctx.fillStyle = '#ffffff';
   ctx.font = '800 42px Inter, Arial';
-  ctx.fillText('Escaneie para acessar', 450, 1120);
-  ctx.fillText('o cardapio digital', 450, 1174);
+  ctx.fillText('Escaneie para acessar o', 450, 1120);
+  ctx.fillText('cardapio digital', 450, 1174);
   ctx.fillStyle = 'rgba(255,255,255,.62)';
   ctx.font = '500 24px Inter, Arial';
   ctx.fillText(tableQrUrl(table, publicBase), 450, 1224);

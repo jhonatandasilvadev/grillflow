@@ -18,11 +18,12 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { Bell, Minus, Plus, ReceiptText, Send, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { categories } from '../../data/mockData';
 import { currency } from '../../lib/format';
 import { tableQrSlug } from '../../lib/qrCard';
+import { fetchTableByQrToken, saveTableToSupabase } from '../../lib/tablesRepository';
 import { makeId, useAppState } from '../../state/AppState';
 import type { RestaurantTable, TabAccount } from '../../types';
 
@@ -36,42 +37,13 @@ function isValidCpf(value: string) {
   return onlyDigits(value).length === 11;
 }
 
-function tableNameFromSlug(value?: string, queryName?: string | null) {
-  if (queryName?.trim()) return queryName.trim();
-  if (!value) return 'Mesa';
-
-  const readable = value
-    .replace(/^mesa[-_]?/i, 'Mesa ')
-    .replace(/[-_]+/g, ' ')
-    .trim();
-
-  return readable || 'Mesa';
-}
-
-function tableFromQrRoute(tableId?: string, queryName?: string | null): RestaurantTable | null {
-  if (!tableId) return null;
-
-  return {
-    id: tableId,
-    name: tableNameFromSlug(tableId, queryName),
-    seats: 4,
-    status: 'livre',
-    billTotal: 0,
-    tabs: 0,
-    x: 50,
-    y: 50,
-    width: 150,
-    height: 116,
-    qrSlug: tableId
-  };
-}
-
 export function PublicMenuPage() {
   const { tableId } = useParams();
-  const [searchParams] = useSearchParams();
   const { products, orders, setOrders, tables, tabs, setTabs, setTables, settings } = useAppState();
-  const localTable = tables.find((item) => item.id === tableId || tableQrSlug(item) === tableId);
-  const table = localTable ?? tableFromQrRoute(tableId, searchParams.get('mesa'));
+  const [remoteTable, setRemoteTable] = useState<RestaurantTable | null>(null);
+  const [loadingTable, setLoadingTable] = useState(true);
+  const localTable = tables.find((item) => item.qrToken === tableId || item.id === tableId || tableQrSlug(item) === tableId);
+  const table = remoteTable ?? localTable ?? null;
   const sessionKey = `grillflow.public-command.${table ? tableQrSlug(table) : tableId}`;
   const storedCommandId = localStorage.getItem(sessionKey);
   const existingCommand = tabs.find((tab) => tab.id === storedCommandId && tab.status === 'aberta');
@@ -81,6 +53,28 @@ export function PublicMenuPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderObservation, setOrderObservation] = useState('');
   const toast = useToast();
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadTable() {
+      if (!tableId) {
+        setLoadingTable(false);
+        return;
+      }
+
+      setLoadingTable(true);
+      const tableFromDb = await fetchTableByQrToken(tableId);
+      if (!active) return;
+      setRemoteTable(tableFromDb);
+      setLoadingTable(false);
+    }
+
+    loadTable();
+    return () => {
+      active = false;
+    };
+  }, [tableId]);
 
   const commandOrders = useMemo(
     () => orders.filter((order) => command?.orderIds.includes(order.id)),
@@ -110,11 +104,9 @@ export function PublicMenuPage() {
     };
 
     setTabs([newCommand, ...tabs]);
-    setTables(
-      localTable
-        ? tables.map((item) => (item.id === table.id ? { ...item, status: 'ocupada', tabs: item.tabs + 1 } : item))
-        : [{ ...table, status: 'ocupada', tabs: 1 }, ...tables]
-    );
+    const nextTable = { ...table, status: 'ocupada' as const, tabs: table.tabs + 1 };
+    setTables(localTable ? tables.map((item) => (item.id === table.id ? nextTable : item)) : [nextTable, ...tables]);
+    saveTableToSupabase(nextTable);
     localStorage.setItem(sessionKey, newCommand.id);
     setCommand(newCommand);
     toast({ title: 'Comanda aberta', status: 'success' });
@@ -165,10 +157,26 @@ export function PublicMenuPage() {
     toast({ title: 'Pedido enviado para a cozinha', status: 'success' });
   }
 
+  if (loadingTable && !localTable) {
+    return (
+      <Box minH="100vh" bg="brand.bg" py={12}>
+        <Container maxW="520px"><Card><CardBody><Text fontWeight={900}>Carregando mesa</Text><Text mt={2} color="whiteAlpha.700">Estamos preparando o cardapio para voce.</Text></CardBody></Card></Container>
+      </Box>
+    );
+  }
+
   if (!table) {
     return (
       <Box minH="100vh" bg="brand.bg" py={12}>
         <Container maxW="520px"><Card><CardBody><Text fontWeight={900}>Mesa nao encontrada</Text><Text mt={2} color="whiteAlpha.700">Confira o QR Code e tente novamente.</Text></CardBody></Card></Container>
+      </Box>
+    );
+  }
+
+  if (!table.active || table.archived) {
+    return (
+      <Box minH="100vh" bg="brand.bg" py={12}>
+        <Container maxW="520px"><Card><CardBody><Text fontWeight={900}>Mesa temporariamente indisponivel</Text><Text mt={2} color="whiteAlpha.700">Por favor, chame um atendente.</Text></CardBody></Card></Container>
       </Box>
     );
   }

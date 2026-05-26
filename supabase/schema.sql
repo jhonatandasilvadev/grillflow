@@ -20,8 +20,12 @@ create table public.tables (
   seats int not null default 4,
   status table_status not null default 'livre',
   qr_token text not null unique default encode(gen_random_bytes(16), 'hex'),
+  active boolean not null default true,
+  archived boolean not null default false,
   position_x numeric(5, 2) not null default 50,
   position_y numeric(5, 2) not null default 50,
+  width numeric(6, 2) not null default 150,
+  height numeric(6, 2) not null default 116,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -124,7 +128,18 @@ alter table public.inventory enable row level security;
 alter table public.cash_flow enable row level security;
 alter table public.expenses enable row level security;
 
+alter table public.tables add column if not exists qr_token text;
+update public.tables set qr_token = encode(gen_random_bytes(16), 'hex') where qr_token is null or qr_token = '';
+alter table public.tables alter column qr_token set not null;
+create unique index if not exists tables_qr_token_key on public.tables (qr_token);
+alter table public.tables add column if not exists active boolean not null default true;
+alter table public.tables add column if not exists archived boolean not null default false;
+alter table public.tables add column if not exists width numeric(6, 2) not null default 150;
+alter table public.tables add column if not exists height numeric(6, 2) not null default 116;
+
 create policy "authenticated read settings" on public.settings for select to authenticated using (true);
+create policy "public read tables by qr" on public.tables for select to anon, authenticated using (true);
+create policy "public manage tables" on public.tables for all to anon using (true) with check (true);
 create policy "authenticated full tables" on public.tables for all to authenticated using (true) with check (true);
 create policy "public read active categories" on public.categories for select to anon, authenticated using (active = true);
 create policy "authenticated full categories" on public.categories for all to authenticated using (true) with check (true);
@@ -146,4 +161,3 @@ alter publication supabase_realtime add table public.orders;
 alter publication supabase_realtime add table public.order_items;
 alter publication supabase_realtime add table public.inventory;
 alter publication supabase_realtime add table public.cash_flow;
-

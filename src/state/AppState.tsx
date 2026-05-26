@@ -21,7 +21,8 @@ import type {
   RestaurantTable,
   TabAccount
 } from '../types';
-import { slugifyTable } from '../lib/qrCard';
+import { createQrToken } from '../lib/qrCard';
+import { fetchTablesFromSupabase, saveTableToSupabase } from '../lib/tablesRepository';
 
 interface AppData {
   tables: RestaurantTable[];
@@ -117,14 +118,38 @@ function loadData(): AppData {
 function normalizeTables(tables: RestaurantTable[]) {
   return tables.map((table) => ({
     ...table,
+    active: table.active ?? true,
+    archived: table.archived ?? false,
     width: table.width ?? 150,
     height: table.height ?? 116,
-    qrSlug: table.qrSlug ?? slugifyTable(table.name, table.id)
+    qrToken: table.qrToken ?? table.qrSlug ?? createQrToken()
   }));
 }
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(loadData);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRemoteTables() {
+      const remoteTables = await fetchTablesFromSupabase();
+      if (!active || !remoteTables) return;
+
+      if (remoteTables.length > 0) {
+        setData((current) => ({ ...current, tables: normalizeTables(remoteTables) }));
+        return;
+      }
+
+      const localTables = normalizeTables(loadData().tables);
+      await Promise.all(localTables.map((table) => saveTableToSupabase(table)));
+    }
+
+    loadRemoteTables();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     try {

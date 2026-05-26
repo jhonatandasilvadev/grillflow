@@ -1,5 +1,6 @@
 import {
   Box,
+  Badge,
   Button,
   Card,
   CardBody,
@@ -26,17 +27,18 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Copy, Download, Eye, FileDown, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Archive, Copy, Download, Eye, FileDown, Pencil, Plus, Power, PowerOff, Users } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { currency } from '../../lib/format';
 import {
   createQrCardDataUrl,
+  createQrToken,
   downloadQrPdf,
   downloadQrPng,
-  slugifyTable,
   tableQrSlug,
   tableQrUrl
 } from '../../lib/qrCard';
+import { saveTableToSupabase } from '../../lib/tablesRepository';
 import { makeId, useAppState } from '../../state/AppState';
 import type { RestaurantTable, TableStatus } from '../../types';
 import { PageHeader } from '../../ui/PageHeader';
@@ -51,14 +53,22 @@ function emptyTable(): RestaurantTable {
     name: '',
     seats: 4,
     status: 'livre',
+    active: true,
+    archived: false,
     billTotal: 0,
     tabs: 0,
     x: 50,
     y: 50,
     width: 150,
     height: 116,
-    qrSlug: id
+    qrToken: createQrToken()
   };
+}
+
+function tableAvailability(table: RestaurantTable) {
+  if (table.archived) return { label: 'Arquivada', colorScheme: 'gray' };
+  if (!table.active) return { label: 'Inativa', colorScheme: 'red' };
+  return { label: 'Ativa', colorScheme: 'green' };
 }
 
 export function TablesPage() {
@@ -67,12 +77,17 @@ export function TablesPage() {
   const [qrPreview, setQrPreview] = useState<{ table: RestaurantTable; image: string } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const hallRef = useRef<HTMLDivElement | null>(null);
+  const latestDraggedTable = useRef<RestaurantTable | null>(null);
   const modal = useDisclosure();
   const qrModal = useDisclosure();
   const toast = useToast();
   const publicBase = settings.publicOrderBaseUrl || `${window.location.origin}/mesa`;
 
-  function saveTable() {
+  async function persistTable(table: RestaurantTable) {
+    return (await saveTableToSupabase(table)) ?? table;
+  }
+
+  async function saveTable() {
     if (!draft.name.trim()) return toast({ title: 'Nome da mesa obrigatorio', status: 'warning' });
     if (draft.seats <= 0) return toast({ title: 'Quantidade de lugares obrigatoria', status: 'warning' });
     const exists = tables.some((table) => table.id === draft.id);
@@ -80,23 +95,35 @@ export function TablesPage() {
       ...draft,
       width: draft.width ?? 150,
       height: draft.height ?? 116,
-      qrSlug: draft.qrSlug ?? slugifyTable(draft.name, draft.id)
+      qrToken: draft.qrToken || createQrToken(),
+      active: draft.active ?? true,
+      archived: draft.archived ?? false
     };
-    setTables(exists ? tables.map((table) => (table.id === draft.id ? nextTable : table)) : [...tables, nextTable]);
+    const persistedTable = await persistTable(nextTable);
+    setTables(exists ? tables.map((table) => (table.id === draft.id ? persistedTable : table)) : [...tables, persistedTable]);
     toast({ title: exists ? 'Mesa atualizada' : 'Mesa cadastrada', status: 'success' });
     modal.onClose();
   }
 
-  function removeTable(tableId: string) {
-    if (tabs.some((tab) => tab.tableId === tableId && tab.status !== 'fechada')) {
-      return toast({ title: 'Feche as comandas antes de excluir', status: 'warning' });
+  async function toggleTableActive(table: RestaurantTable) {
+    const nextTable = table.archived ? { ...table, active: true, archived: false } : { ...table, active: !table.active };
+    const persistedTable = await persistTable(nextTable);
+    setTables(tables.map((item) => (item.id === table.id ? persistedTable : item)));
+    toast({ title: nextTable.active ? 'Mesa ativada' : 'Mesa desativada', status: 'success' });
+  }
+
+  async function archiveTable(table: RestaurantTable) {
+    if (tabs.some((tab) => tab.tableId === table.id && tab.status !== 'fechada')) {
+      return toast({ title: 'Feche as comandas antes de arquivar', status: 'warning' });
     }
-    if (!window.confirm('Excluir esta mesa?')) return;
-    setTables(tables.filter((table) => table.id !== tableId));
-    toast({ title: 'Mesa excluida', status: 'success' });
+    if (!window.confirm('Arquivar esta mesa? O QR Code fisico continuara reservado para ela.')) return;
+    const persistedTable = await persistTable({ ...table, active: false, archived: true });
+    setTables(tables.map((item) => (item.id === table.id ? persistedTable : item)));
+    toast({ title: 'Mesa arquivada', status: 'success' });
   }
 
   function openTab(table: RestaurantTable) {
+    if (!table.active || table.archived) return toast({ title: 'Mesa indisponivel', status: 'warning' });
     const tab = {
       id: makeId('tab'),
       tableId: table.id,
@@ -109,7 +136,9 @@ export function TablesPage() {
       createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     };
     setTabs([tab, ...tabs]);
-    setTables(tables.map((item) => (item.id === table.id ? { ...item, status: 'ocupada', tabs: item.tabs + 1 } : item)));
+    const nextTable = { ...table, status: 'ocupada' as const, tabs: table.tabs + 1 };
+    setTables(tables.map((item) => (item.id === table.id ? nextTable : item)));
+    saveTableToSupabase(nextTable);
     toast({ title: 'Comanda aberta pela mesa', status: 'success' });
   }
 
@@ -121,6 +150,7 @@ export function TablesPage() {
     const offsetX = event.clientX - targetRect.left;
     const offsetY = event.clientY - targetRect.top;
     setDraggingId(table.id);
+    latestDraggedTable.current = table;
     target.setPointerCapture(event.pointerId);
 
     const move = (moveEvent: PointerEvent) => {
@@ -133,6 +163,7 @@ export function TablesPage() {
       const centerY = Math.min(Math.max(top + height / 2, height / 2), hallRect.height - height / 2);
       const x = Number(((centerX / hallRect.width) * 100).toFixed(2));
       const y = Number(((centerY / hallRect.height) * 100).toFixed(2));
+      latestDraggedTable.current = { ...table, x, y, width, height };
       setTables(tables.map((item) => (item.id === table.id ? { ...item, x, y, width, height } : item)));
     };
 
@@ -140,6 +171,9 @@ export function TablesPage() {
       setDraggingId(null);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', stop);
+      if (latestDraggedTable.current) {
+        saveTableToSupabase(latestDraggedTable.current);
+      }
       toast({ title: 'Posicao da mesa salva', status: 'success', duration: 900 });
     };
 
@@ -224,7 +258,7 @@ export function TablesPage() {
                   minH={`${table.height ?? 116}px`}
                   p={4}
                   borderRadius="18px"
-                  bg={table.status === 'livre' ? 'rgba(57,217,138,.14)' : 'rgba(255,107,26,.16)'}
+                  bg={!table.active || table.archived ? 'rgba(255,255,255,.07)' : table.status === 'livre' ? 'rgba(57,217,138,.14)' : 'rgba(255,107,26,.16)'}
                   border="1px solid"
                   borderColor={draggingId === table.id ? 'brand.orange' : 'whiteAlpha.200'}
                   boxShadow="0 20px 50px rgba(0,0,0,.25)"
@@ -238,7 +272,7 @@ export function TablesPage() {
                     <Icon as={Users} boxSize={4} color="whiteAlpha.700" />
                   </HStack>
                   <Text color="whiteAlpha.700" fontSize="sm">{table.seats} lugares</Text>
-                  <Box mt={3}><StatusBadge status={table.status} /></Box>
+                  <HStack mt={3} spacing={2} wrap="wrap"><StatusBadge status={table.status} /><Badge colorScheme={tableAvailability(table).colorScheme}>{tableAvailability(table).label}</Badge></HStack>
                 </Box>
               ))}
             </Box>
@@ -254,9 +288,19 @@ export function TablesPage() {
                   <Box>
                     <Text fontWeight={900} fontSize="lg">{table.name}</Text>
                     <Text color="whiteAlpha.600" fontSize="sm">{tables.length ? tableQrSlug(table) : ''}</Text>
+                    <Badge mt={2} colorScheme={tableAvailability(table).colorScheme}>{tableAvailability(table).label}</Badge>
                     <Text color="whiteAlpha.600" fontSize="sm">{table.tabs} comandas abertas</Text>
                     <Text mt={3} fontWeight={800}>{currency.format(table.billTotal)}</Text>
-                    <Select size="sm" mt={3} value={table.status} onChange={(event) => setTables(tables.map((item) => (item.id === table.id ? { ...item, status: event.target.value as TableStatus } : item)))}>
+                    <Select
+                      size="sm"
+                      mt={3}
+                      value={table.status}
+                      onChange={(event) => {
+                        const nextTable = { ...table, status: event.target.value as TableStatus };
+                        setTables(tables.map((item) => (item.id === table.id ? nextTable : item)));
+                        saveTableToSupabase(nextTable);
+                      }}
+                    >
                       {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                     </Select>
                   </Box>
@@ -266,11 +310,12 @@ export function TablesPage() {
                 </HStack>
                 <HStack mt={4} flexWrap="wrap">
                   <Button size="sm" variant="ghost" onClick={() => openTab(table)}>Abrir comanda</Button>
+                  <Button size="sm" variant="ghost" leftIcon={table.active ? <PowerOff size={15} /> : <Power size={15} />} onClick={() => toggleTableActive(table)}>{table.active ? 'Desativar' : 'Ativar'}</Button>
                   <Button size="sm" variant="ghost" leftIcon={<Eye size={15} />} onClick={() => previewQr(table)}>Visualizar QR</Button>
                   <Button size="sm" variant="ghost" leftIcon={<Download size={15} />} onClick={() => downloadOne(table)}>Baixar QR</Button>
                   <Button size="sm" variant="ghost" leftIcon={<Copy size={15} />} onClick={() => copyLink(table)}>Copiar link</Button>
                   <Button size="sm" variant="ghost" leftIcon={<Pencil size={15} />} onClick={() => { setDraft(table); modal.onOpen(); }}>Editar</Button>
-                  <Button size="sm" variant="ghost" leftIcon={<Trash2 size={15} />} onClick={() => removeTable(table.id)}>Excluir</Button>
+                  <Button size="sm" variant="ghost" leftIcon={<Archive size={15} />} onClick={() => archiveTable(table)}>Arquivar</Button>
                 </HStack>
               </CardBody>
             </Card>
