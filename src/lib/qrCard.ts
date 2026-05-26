@@ -18,7 +18,9 @@ export function tableQrSlug(table: RestaurantTable) {
 }
 
 export function tableQrUrl(table: RestaurantTable, publicBase: string) {
-  return `${publicBase.replace(/\/$/, '')}/${tableQrSlug(table)}`;
+  const url = `${publicBase.replace(/\/$/, '')}/${tableQrSlug(table)}`;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}mesa=${encodeURIComponent(table.name)}`;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {

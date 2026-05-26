@@ -19,12 +19,12 @@ import {
 } from '@chakra-ui/react';
 import { Bell, Minus, Plus, ReceiptText, Send, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { categories } from '../../data/mockData';
 import { currency } from '../../lib/format';
 import { tableQrSlug } from '../../lib/qrCard';
 import { makeId, useAppState } from '../../state/AppState';
-import type { TabAccount } from '../../types';
+import type { RestaurantTable, TabAccount } from '../../types';
 
 type CartItem = { productId: string; name: string; qty: number; notes?: string };
 
@@ -36,10 +36,42 @@ function isValidCpf(value: string) {
   return onlyDigits(value).length === 11;
 }
 
+function tableNameFromSlug(value?: string, queryName?: string | null) {
+  if (queryName?.trim()) return queryName.trim();
+  if (!value) return 'Mesa';
+
+  const readable = value
+    .replace(/^mesa[-_]?/i, 'Mesa ')
+    .replace(/[-_]+/g, ' ')
+    .trim();
+
+  return readable || 'Mesa';
+}
+
+function tableFromQrRoute(tableId?: string, queryName?: string | null): RestaurantTable | null {
+  if (!tableId) return null;
+
+  return {
+    id: tableId,
+    name: tableNameFromSlug(tableId, queryName),
+    seats: 4,
+    status: 'livre',
+    billTotal: 0,
+    tabs: 0,
+    x: 50,
+    y: 50,
+    width: 150,
+    height: 116,
+    qrSlug: tableId
+  };
+}
+
 export function PublicMenuPage() {
   const { tableId } = useParams();
+  const [searchParams] = useSearchParams();
   const { products, orders, setOrders, tables, tabs, setTabs, setTables, settings } = useAppState();
-  const table = tables.find((item) => item.id === tableId || tableQrSlug(item) === tableId);
+  const localTable = tables.find((item) => item.id === tableId || tableQrSlug(item) === tableId);
+  const table = localTable ?? tableFromQrRoute(tableId, searchParams.get('mesa'));
   const sessionKey = `grillflow.public-command.${table ? tableQrSlug(table) : tableId}`;
   const storedCommandId = localStorage.getItem(sessionKey);
   const existingCommand = tabs.find((tab) => tab.id === storedCommandId && tab.status === 'aberta');
@@ -78,7 +110,11 @@ export function PublicMenuPage() {
     };
 
     setTabs([newCommand, ...tabs]);
-    setTables(tables.map((item) => (item.id === table.id ? { ...item, status: 'ocupada', tabs: item.tabs + 1 } : item)));
+    setTables(
+      localTable
+        ? tables.map((item) => (item.id === table.id ? { ...item, status: 'ocupada', tabs: item.tabs + 1 } : item))
+        : [{ ...table, status: 'ocupada', tabs: 1 }, ...tables]
+    );
     localStorage.setItem(sessionKey, newCommand.id);
     setCommand(newCommand);
     toast({ title: 'Comanda aberta', status: 'success' });
