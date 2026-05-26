@@ -35,7 +35,6 @@ import {
   createQrToken,
   downloadQrPdf,
   downloadQrPng,
-  tableQrSlug,
   tableQrUrl
 } from '../../lib/qrCard';
 import { saveTableToSupabase } from '../../lib/tablesRepository';
@@ -45,9 +44,32 @@ import { PageHeader } from '../../ui/PageHeader';
 import { StatusBadge } from '../../ui/StatusBadge';
 
 const statuses: TableStatus[] = ['livre', 'ocupada', 'pagamento', 'reservada'];
+const gridColumns = 4;
+const gridStartX = 14;
+const gridStartY = 18;
+const gridGapX = 20;
+const gridGapY = 26;
 
-function emptyTable(): RestaurantTable {
+function gridPosition(index: number) {
+  return {
+    x: gridStartX + (index % gridColumns) * gridGapX,
+    y: gridStartY + Math.floor(index / gridColumns) * gridGapY
+  };
+}
+
+function nextGridPosition(tables: RestaurantTable[]) {
+  return gridPosition(tables.length);
+}
+
+function nearestGridPosition(x: number, y: number) {
+  const column = Math.max(0, Math.min(gridColumns - 1, Math.round((x - gridStartX) / gridGapX)));
+  const row = Math.max(0, Math.round((y - gridStartY) / gridGapY));
+  return gridPosition(row * gridColumns + column);
+}
+
+function emptyTable(tables: RestaurantTable[] = []): RestaurantTable {
   const id = makeId('mesa');
+  const position = nextGridPosition(tables);
   return {
     id,
     name: '',
@@ -57,8 +79,8 @@ function emptyTable(): RestaurantTable {
     archived: false,
     billTotal: 0,
     tabs: 0,
-    x: 50,
-    y: 50,
+    x: position.x,
+    y: position.y,
     width: 150,
     height: 116,
     qrToken: createQrToken()
@@ -69,6 +91,10 @@ function tableAvailability(table: RestaurantTable) {
   if (table.archived) return { label: 'Arquivada', colorScheme: 'gray' };
   if (!table.active) return { label: 'Desativada', colorScheme: 'red' };
   return { label: 'Ativa', colorScheme: 'green' };
+}
+
+function alignTablesToGrid(tables: RestaurantTable[]) {
+  return tables.map((table, index) => ({ ...table, ...gridPosition(index), width: 150, height: 116 }));
 }
 
 export function TablesPage() {
@@ -103,6 +129,13 @@ export function TablesPage() {
     setTables(exists ? tables.map((table) => (table.id === draft.id ? persistedTable : table)) : [...tables, persistedTable]);
     toast({ title: exists ? 'Mesa atualizada' : 'Mesa cadastrada', status: 'success' });
     modal.onClose();
+  }
+
+  function alignGrid() {
+    const alignedTables = alignTablesToGrid(tables);
+    setTables(alignedTables);
+    alignedTables.forEach((table) => saveTableToSupabase(table));
+    toast({ title: 'Mesas alinhadas na grade', status: 'success' });
   }
 
   async function toggleTableActive(table: RestaurantTable) {
@@ -172,7 +205,10 @@ export function TablesPage() {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', stop);
       if (latestDraggedTable.current) {
-        saveTableToSupabase(latestDraggedTable.current);
+        const snappedPosition = nearestGridPosition(latestDraggedTable.current.x, latestDraggedTable.current.y);
+        const snappedTable = { ...latestDraggedTable.current, ...snappedPosition };
+        setTables(tables.map((item) => (item.id === table.id ? snappedTable : item)));
+        saveTableToSupabase(snappedTable);
       }
       toast({ title: 'Posicao da mesa salva', status: 'success', duration: 900 });
     };
@@ -226,10 +262,13 @@ export function TablesPage() {
   return (
     <VStack align="stretch" spacing={6}>
       <PageHeader eyebrow="Gestao de mesas" title="Mapa visual do salao">
+        <Button variant="ghost" onClick={alignGrid}>
+          Alinhar grade
+        </Button>
         <Button leftIcon={<FileDown size={17} />} variant="ghost" onClick={downloadAll}>
           Baixar todos os QR Codes
         </Button>
-        <Button leftIcon={<Plus size={17} />} onClick={() => { setDraft(emptyTable()); modal.onOpen(); }}>Cadastrar mesa</Button>
+        <Button leftIcon={<Plus size={17} />} onClick={() => { setDraft(emptyTable(tables)); modal.onOpen(); }}>Cadastrar mesa</Button>
       </PageHeader>
       <Grid templateColumns={{ base: '1fr', xl: '1.2fr .8fr' }} gap={5}>
         <Card>
@@ -284,10 +323,9 @@ export function TablesPage() {
           ) : tables.map((table) => (
             <Card key={table.id}>
               <CardBody>
-                <HStack justify="space-between" align="flex-start">
-                  <Box>
+                <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap={3}>
+                  <Box minW={0} flex="1">
                     <Text fontWeight={900} fontSize="lg">{table.name}</Text>
-                    <Text color="whiteAlpha.600" fontSize="sm">{tables.length ? tableQrSlug(table) : ''}</Text>
                     <Badge mt={2} colorScheme={tableAvailability(table).colorScheme}>{tableAvailability(table).label}</Badge>
                     <Text color="whiteAlpha.600" fontSize="sm">{table.tabs} comandas abertas</Text>
                     <Text mt={3} fontWeight={800}>{currency.format(table.billTotal)}</Text>
@@ -304,7 +342,7 @@ export function TablesPage() {
                       {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                     </Select>
                   </Box>
-                  <Box p={2} bg="white" borderRadius="10px">
+                  <Box p={2} bg="white" borderRadius="10px" flexShrink={0}>
                     <QRCodeSVG value={tableQrUrl(table, publicBase)} size={74} />
                   </Box>
                 </HStack>
