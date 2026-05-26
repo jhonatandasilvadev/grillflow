@@ -22,7 +22,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { categories } from '../../data/mockData';
 import { currency } from '../../lib/format';
+import { saveOrderToSupabase } from '../../lib/ordersRepository';
 import { tableQrSlug } from '../../lib/qrCard';
+import { createServiceRequest } from '../../lib/serviceRequestsRepository';
+import { saveTabToSupabase } from '../../lib/tabsRepository';
 import { fetchTableByQrToken, saveTableToSupabase } from '../../lib/tablesRepository';
 import { makeId, useAppState } from '../../state/AppState';
 import type { RestaurantTable, TabAccount } from '../../types';
@@ -100,7 +103,7 @@ export function PublicMenuPage() {
     [orders, command]
   );
 
-  function openCommand() {
+  async function openCommand() {
     if (!table) return toast({ title: 'Mesa nao encontrada', status: 'error' });
     if (!name.trim()) return toast({ title: 'Informe seu nome completo', status: 'warning' });
     if (!isValidCpf(cpf)) return toast({ title: 'Informe um CPF valido com 11 digitos', status: 'warning' });
@@ -122,12 +125,14 @@ export function PublicMenuPage() {
       total: 0
     };
 
-    setTabs([newCommand, ...tabs]);
+    const persistedCommand = await saveTabToSupabase(newCommand);
+    const finalCommand = persistedCommand ?? newCommand;
+    setTabs([finalCommand, ...tabs.filter((tab) => tab.id !== finalCommand.id)]);
     const nextTable = { ...table, status: 'ocupada' as const, tabs: table.tabs + 1 };
     setTables(localTable ? tables.map((item) => (item.id === table.id ? nextTable : item)) : [nextTable, ...tables]);
     saveTableToSupabase(nextTable);
-    localStorage.setItem(sessionKey, newCommand.id);
-    setCommand(newCommand);
+    localStorage.setItem(sessionKey, finalCommand.id);
+    setCommand(finalCommand);
     toast({ title: 'Comanda aberta', status: 'success' });
   }
 
@@ -144,7 +149,7 @@ export function PublicMenuPage() {
     setCart(cart.map((item) => (item.productId === productId ? { ...item, qty } : item)));
   }
 
-  function sendOrder() {
+  async function sendOrder() {
     if (!table || !command) return toast({ title: 'Abra sua comanda antes de pedir', status: 'warning' });
     if (cart.length === 0) return toast({ title: 'Adicione itens antes de enviar', status: 'warning' });
     const total = cart.reduce((sum, item) => sum + (products.find((product) => product.id === item.productId)?.price ?? 0) * item.qty, 0);
@@ -166,14 +171,48 @@ export function PublicMenuPage() {
       observation: orderObservation,
       source: 'qr' as const
     };
-    const nextCommand = { ...command, orderIds: [...command.orderIds, order.id], total: (command.total ?? 0) + total };
+    const persistedOrder = await saveOrderToSupabase(order);
+    const finalOrder = persistedOrder ?? order;
+    const nextCommand = { ...command, orderIds: [...command.orderIds, finalOrder.id], total: (command.total ?? 0) + total };
 
-    setOrders([order, ...orders]);
+    setOrders([finalOrder, ...orders.filter((item) => item.id !== finalOrder.id)]);
     setTabs(tabs.map((tab) => (tab.id === command.id ? nextCommand : tab)));
+    saveTabToSupabase(nextCommand);
     setCommand(nextCommand);
     setCart([]);
     setOrderObservation('');
     toast({ title: 'Pedido enviado para a cozinha', status: 'success' });
+  }
+
+  async function sendServiceRequest(kind: 'waiter' | 'bill') {
+    if (!table || !command) return toast({ title: 'Abra sua comanda antes de chamar', status: 'warning' });
+    const created = await createServiceRequest({
+      tableId: table.id,
+      table: table.name,
+      commandId: command.id,
+      customer: command.customerName ?? command.customer,
+      kind
+    });
+
+    if (!created) {
+      const key = 'grillflow.public-service-requests';
+      const current = JSON.parse(localStorage.getItem(key) ?? '[]') as unknown[];
+      localStorage.setItem(key, JSON.stringify([
+        {
+          id: makeId('chamado'),
+          tableId: table.id,
+          table: table.name,
+          commandId: command.id,
+          customer: command.customerName ?? command.customer,
+          kind,
+          status: 'aberta',
+          createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        },
+        ...current
+      ]));
+    }
+
+    toast({ title: kind === 'waiter' ? 'Garcom chamado' : 'Solicitacao de conta enviada', status: 'success' });
   }
 
   if (loadingTable && !localTable) {
@@ -232,7 +271,7 @@ export function PublicMenuPage() {
           <Text color="brand.orange" fontWeight={900}>{settings.restaurantName}</Text>
           <Text mt={3} fontSize={{ base: '4xl', md: '5xl' }} fontWeight={900} lineHeight="1">Cardapio da {table.name}</Text>
           <Text mt={4} color="whiteAlpha.800" maxW="520px">Comanda de {command.customerName ?? command.customer}. Escolha seus itens e envie para a cozinha.</Text>
-          <HStack mt={6} wrap="wrap"><Button leftIcon={<Bell size={17} />} variant="ghost" bg="whiteAlpha.100" onClick={() => toast({ title: 'Garcom chamado', status: 'success' })}>Chamar garcom</Button><Button leftIcon={<ReceiptText size={17} />} variant="ghost" bg="whiteAlpha.100" onClick={() => toast({ title: 'Solicitacao de conta enviada', status: 'success' })}>Pedir conta</Button></HStack>
+          <HStack mt={6} wrap="wrap"><Button leftIcon={<Bell size={17} />} variant="ghost" bg="whiteAlpha.100" onClick={() => sendServiceRequest('waiter')}>Chamar garcom</Button><Button leftIcon={<ReceiptText size={17} />} variant="ghost" bg="whiteAlpha.100" onClick={() => sendServiceRequest('bill')}>Pedir conta</Button></HStack>
         </Container>
       </Box>
       <Container maxW="760px" mt="-44px" pb={cart.length > 0 ? 80 : 28}>

@@ -1,5 +1,6 @@
 import { Button, Card, CardBody, Grid, HStack, Text, VStack, useToast } from '@chakra-ui/react';
 import { BellRing, Printer } from 'lucide-react';
+import { updateOrderStatusInSupabase } from '../../lib/ordersRepository';
 import { useAppState } from '../../state/AppState';
 import type { OrderStatus } from '../../types';
 import { PageHeader } from '../../ui/PageHeader';
@@ -12,6 +13,7 @@ export function KitchenPage() {
 
   function updateStatus(orderId: string, status: OrderStatus) {
     setOrders(orders.map((order) => (order.id === orderId ? { ...order, status } : order)));
+    updateOrderStatusInSupabase(orderId, status);
     toast({ title: 'Status atualizado na cozinha', status: 'success' });
   }
 

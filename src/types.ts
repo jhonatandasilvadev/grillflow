@@ -117,9 +117,23 @@ export interface InventoryMovement {
 
 export interface AppNotification {
   id: string;
-  orderId: string;
+  orderId?: string;
+  requestId?: string;
+  kind?: 'order' | 'waiter' | 'bill';
   table: string;
   customer: string;
   createdAt: string;
   status: 'unread' | 'read';
+  message?: string;
+}
+
+export interface ServiceRequest {
+  id: string;
+  tableId?: string;
+  table: string;
+  commandId?: string;
+  customer: string;
+  kind: 'waiter' | 'bill';
+  status: 'aberta' | 'atendida' | 'cancelada';
+  createdAt: string;
 }

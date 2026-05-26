@@ -41,8 +41,10 @@ import type { LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isQrOrder, playOrderAlert, SOUND_ENABLED_KEY } from '../lib/adminAlerts';
+import { fetchOpenServiceRequests } from '../lib/serviceRequestsRepository';
+import { supabase } from '../lib/supabase';
 import { STORAGE_KEY, useAppState } from '../state/AppState';
-import type { AppNotification, Order } from '../types';
+import type { AppNotification, Order, ServiceRequest } from '../types';
 
 const navItems: Array<{ label: string; href: string; icon: LucideIcon }> = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -110,6 +112,7 @@ export function AdminLayout() {
   const { orders, setOrders, notifications, setNotifications, settings } = useAppState();
   const [soundEnabled, setSoundEnabled] = useState(localStorage.getItem(SOUND_ENABLED_KEY) === 'true');
   const notifiedOrders = useRef(new Set(notifications.map((notification) => notification.orderId)));
+  const notifiedRequests = useRef(new Set(notifications.map((notification) => notification.requestId)));
   const unread = notifications.filter((notification) => notification.status === 'unread');
 
   const qrOrders = useMemo(() => orders.filter(isQrOrder), [orders]);
@@ -120,12 +123,13 @@ export function AdminLayout() {
     const notification: AppNotification = {
       id: `notification-${order.id}`,
       orderId: order.id,
+      kind: 'order',
       table: order.table,
       customer: order.customerName ?? order.customer,
       createdAt: order.createdAt,
       status: 'unread'
     };
-    setNotifications([notification, ...notifications]);
+    setNotifications((current) => [notification, ...current]);
     toast({
       title: 'Novo pedido recebido',
       description: `${order.table} - Cliente: ${order.customerName ?? order.customer}`,
@@ -134,11 +138,74 @@ export function AdminLayout() {
       isClosable: true
     });
     if (soundEnabled) playOrderAlert();
-  }, [notifications, setNotifications, soundEnabled, toast]);
+  }, [setNotifications, soundEnabled, toast]);
+
+  const registerNewRequest = useCallback((request: ServiceRequest) => {
+    if (notifiedRequests.current.has(request.id)) return;
+    notifiedRequests.current.add(request.id);
+    const notification: AppNotification = {
+      id: `notification-${request.id}`,
+      requestId: request.id,
+      kind: request.kind,
+      table: request.table,
+      customer: request.customer,
+      createdAt: request.createdAt,
+      status: 'unread',
+      message: request.kind === 'waiter' ? 'Chamar garcom' : 'Pedido de conta'
+    };
+    setNotifications((current) => [notification, ...current]);
+    toast({
+      title: notification.message,
+      description: `${request.table} - Cliente: ${request.customer}`,
+      status: 'info',
+      duration: 6000,
+      isClosable: true
+    });
+    if (soundEnabled) playOrderAlert();
+  }, [setNotifications, soundEnabled, toast]);
 
   useEffect(() => {
     qrOrders.forEach(registerNewOrder);
   }, [qrOrders, registerNewOrder]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function syncRequests() {
+      const requests = await fetchOpenServiceRequests();
+      if (!active) return;
+      requests?.forEach(registerNewRequest);
+
+      try {
+        const stored = JSON.parse(localStorage.getItem('grillflow.public-service-requests') ?? '[]') as ServiceRequest[];
+        stored.filter((request) => request.status === 'aberta').forEach(registerNewRequest);
+      } catch (error) {
+        console.error('Erro ao consultar chamados locais', error);
+      }
+    }
+
+    syncRequests();
+    const interval = window.setInterval(syncRequests, 3000);
+
+    const supabaseClient = supabase;
+    if (!supabaseClient) {
+      return () => {
+        active = false;
+        window.clearInterval(interval);
+      };
+    }
+
+    const channel = supabaseClient
+      .channel('grillflow-service-requests-alerts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'service_requests' }, syncRequests)
+      .subscribe();
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      supabaseClient.removeChannel(channel);
+    };
+  }, [registerNewRequest]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -246,11 +313,13 @@ export function AdminLayout() {
                       <Text color="whiteAlpha.600" fontSize="sm">Nenhum pedido novo.</Text>
                     ) : notifications.slice(0, 8).map((notification) => (
                       <Box key={notification.id} p={3} borderRadius="12px" bg={notification.status === 'unread' ? 'whiteAlpha.200' : 'whiteAlpha.100'}>
-                        <Text fontWeight={900}>Novo pedido recebido</Text>
+                        <Text fontWeight={900}>{notification.message ?? 'Novo pedido recebido'}</Text>
                         <Text color="whiteAlpha.700" fontSize="sm">{notification.table} - Cliente: {notification.customer}</Text>
                         <HStack justify="space-between" mt={2}>
                           <Text color="whiteAlpha.500" fontSize="xs">{notification.createdAt}</Text>
-                          <Button size="xs" onClick={() => navigate('/admin/pedidos')}>Ver pedido</Button>
+                          <Button size="xs" onClick={() => navigate(notification.kind === 'order' ? '/admin/pedidos' : '/admin/mesas')}>
+                            {notification.kind === 'order' ? 'Ver pedido' : 'Ver mesa'}
+                          </Button>
                         </HStack>
                       </Box>
                     ))}

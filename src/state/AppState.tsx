@@ -22,6 +22,9 @@ import type {
   TabAccount
 } from '../types';
 import { createQrToken } from '../lib/qrCard';
+import { fetchOrdersFromSupabase } from '../lib/ordersRepository';
+import { supabase } from '../lib/supabase';
+import { fetchTabsFromSupabase } from '../lib/tabsRepository';
 import { fetchTablesFromSupabase, saveTableToSupabase } from '../lib/tablesRepository';
 
 interface AppData {
@@ -49,7 +52,7 @@ interface AppState extends AppData {
   setTabs: (items: TabAccount[]) => void;
   setInventoryMovements: (items: InventoryMovement[]) => void;
   setCashOpen: (open: boolean) => void;
-  setNotifications: (items: AppNotification[]) => void;
+  setNotifications: (items: AppNotification[] | ((current: AppNotification[]) => AppNotification[])) => void;
   setSettings: (settings: RestaurantSettings) => void;
   resetDemoData: () => void;
 }
@@ -173,6 +176,67 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let active = true;
+
+    async function syncRemoteOrders() {
+      const remoteOrders = await fetchOrdersFromSupabase();
+      if (!active || !remoteOrders || remoteOrders.length === 0) return;
+      setData((current) => ({ ...current, orders: remoteOrders }));
+    }
+
+    async function syncRemoteTabs() {
+      const remoteTabs = await fetchTabsFromSupabase();
+      if (!active || !remoteTabs || remoteTabs.length === 0) return;
+      setData((current) => ({ ...current, tabs: remoteTabs }));
+    }
+
+    syncRemoteOrders();
+    syncRemoteTabs();
+
+    const supabaseClient = supabase;
+    if (!supabaseClient) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const refreshOrders = () => {
+      syncRemoteOrders();
+    };
+    const refreshTabs = () => {
+      syncRemoteTabs();
+    };
+
+    const ordersChannel = supabaseClient
+      .channel('grillflow-orders-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, refreshOrders)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, refreshOrders)
+      .subscribe();
+
+    const tablesChannel = supabaseClient
+      .channel('grillflow-tables-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tables' }, async () => {
+        const remoteTables = await fetchTablesFromSupabase();
+        if (active && remoteTables && remoteTables.length > 0) {
+          setData((current) => ({ ...current, tables: mergeDefaultTables(remoteTables) }));
+        }
+      })
+      .subscribe();
+
+    const tabsChannel = supabaseClient
+      .channel('grillflow-tabs-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tab_accounts' }, refreshTabs)
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabaseClient.removeChannel(ordersChannel);
+      supabaseClient.removeChannel(tablesChannel);
+      supabaseClient.removeChannel(tabsChannel);
+    };
+  }, []);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (error) {
@@ -193,7 +257,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       setInventoryMovements: (inventoryMovements) =>
         setData((current) => ({ ...current, inventoryMovements })),
       setCashOpen: (cashOpen) => setData((current) => ({ ...current, cashOpen })),
-      setNotifications: (notifications) => setData((current) => ({ ...current, notifications })),
+      setNotifications: (notifications) =>
+        setData((current) => ({
+          ...current,
+          notifications: typeof notifications === 'function' ? notifications(current.notifications) : notifications
+        })),
       setSettings: (settings) => setData((current) => ({ ...current, settings })),
       resetDemoData: () => setData(initialData)
     }),

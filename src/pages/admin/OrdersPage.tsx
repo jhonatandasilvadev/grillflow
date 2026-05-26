@@ -27,6 +27,7 @@ import { Bell, Filter, Pencil, Plus, Send, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { products, tables } from '../../data/mockData';
 import { currency } from '../../lib/format';
+import { saveOrderToSupabase, updateOrderStatusInSupabase } from '../../lib/ordersRepository';
 import { makeId, useAppState } from '../../state/AppState';
 import type { Order, OrderStatus } from '../../types';
 import { PageHeader } from '../../ui/PageHeader';
@@ -83,7 +84,7 @@ export function OrdersPage() {
     }, 0);
   }
 
-  function saveOrder() {
+  async function saveOrder() {
     if (!draft.customer.trim()) {
       toast({ title: 'Informe o cliente', status: 'warning' });
       return;
@@ -94,7 +95,9 @@ export function OrdersPage() {
     }
     const order = { ...draft, total: calculateTotal(draft) };
     const exists = orders.some((item) => item.id === order.id);
-    setOrders(exists ? orders.map((item) => (item.id === order.id ? order : item)) : [order, ...orders]);
+    const persistedOrder = exists ? null : await saveOrderToSupabase({ ...order, source: 'admin' });
+    const finalOrder = persistedOrder ?? order;
+    setOrders(exists ? orders.map((item) => (item.id === finalOrder.id ? finalOrder : item)) : [finalOrder, ...orders]);
     toast({ title: exists ? 'Pedido atualizado' : 'Pedido criado', status: 'success' });
     onClose();
   }
@@ -107,6 +110,7 @@ export function OrdersPage() {
 
   function updateStatus(order: Order, status: OrderStatus) {
     setOrders(orders.map((item) => (item.id === order.id ? { ...item, status } : item)));
+    updateOrderStatusInSupabase(order.id, status);
     toast({ title: `Pedido ${order.number} atualizado`, status: 'success' });
   }
 
