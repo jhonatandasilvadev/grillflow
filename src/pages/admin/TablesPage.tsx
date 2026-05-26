@@ -27,8 +27,8 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { QRCodeSVG } from 'qrcode.react';
-import { Archive, Copy, Download, Eye, FileDown, Pencil, Plus, Power, PowerOff, Users } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Archive, Copy, Download, Eye, FileDown, LayoutGrid, ListFilter, Pencil, Plus, Power, PowerOff, RotateCcw, Users } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 import { currency } from '../../lib/format';
 import {
   createQrCardDataUrl,
@@ -44,6 +44,7 @@ import { PageHeader } from '../../ui/PageHeader';
 import { StatusBadge } from '../../ui/StatusBadge';
 
 const statuses: TableStatus[] = ['livre', 'ocupada', 'pagamento', 'reservada'];
+type AvailabilityFilter = 'todas' | 'ativas' | 'desativadas' | 'arquivadas';
 const gridColumns = 4;
 const gridStartX = 14;
 const gridStartY = 18;
@@ -102,12 +103,28 @@ export function TablesPage() {
   const [draft, setDraft] = useState<RestaurantTable>(emptyTable);
   const [qrPreview, setQrPreview] = useState<{ table: RestaurantTable; image: string } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('todas');
+  const [statusFilter, setStatusFilter] = useState<TableStatus | ''>('');
   const hallRef = useRef<HTMLDivElement | null>(null);
   const latestDraggedTable = useRef<RestaurantTable | null>(null);
   const modal = useDisclosure();
   const qrModal = useDisclosure();
   const toast = useToast();
   const publicBase = settings.publicOrderBaseUrl || `${window.location.origin}/mesa`;
+
+  const visibleTables = useMemo(
+    () =>
+      tables.filter((table) => {
+        const matchesAvailability =
+          availabilityFilter === 'todas' ||
+          (availabilityFilter === 'ativas' && table.active && !table.archived) ||
+          (availabilityFilter === 'desativadas' && !table.active && !table.archived) ||
+          (availabilityFilter === 'arquivadas' && table.archived);
+        const matchesStatus = !statusFilter || table.status === statusFilter;
+        return matchesAvailability && matchesStatus;
+      }),
+    [tables, availabilityFilter, statusFilter]
+  );
 
   async function persistTable(table: RestaurantTable) {
     return (await saveTableToSupabase(table)) ?? table;
@@ -136,6 +153,26 @@ export function TablesPage() {
     setTables(alignedTables);
     alignedTables.forEach((table) => saveTableToSupabase(table));
     toast({ title: 'Mesas alinhadas na grade', status: 'success' });
+  }
+
+  function organizeByStatus() {
+    const statusOrder: Record<TableStatus, number> = { livre: 0, ocupada: 1, pagamento: 2, reservada: 3 };
+    const organizedTables = alignTablesToGrid(
+      [...tables].sort((a, b) => {
+        if (a.archived !== b.archived) return a.archived ? 1 : -1;
+        if (a.active !== b.active) return a.active ? -1 : 1;
+        if (a.status !== b.status) return statusOrder[a.status] - statusOrder[b.status];
+        return a.name.localeCompare(b.name, 'pt-BR', { numeric: true });
+      })
+    );
+    setTables(organizedTables);
+    organizedTables.forEach((table) => saveTableToSupabase(table));
+    toast({ title: 'Mesas organizadas por status', status: 'success' });
+  }
+
+  function clearFilters() {
+    setAvailabilityFilter('todas');
+    setStatusFilter('');
   }
 
   async function toggleTableActive(table: RestaurantTable) {
@@ -262,9 +299,6 @@ export function TablesPage() {
   return (
     <VStack align="stretch" spacing={6}>
       <PageHeader eyebrow="Gestao de mesas" title="Mapa visual do salao">
-        <Button variant="ghost" onClick={alignGrid}>
-          Alinhar grade
-        </Button>
         <Button leftIcon={<FileDown size={17} />} variant="ghost" onClick={downloadAll}>
           Baixar todos os QR Codes
         </Button>
@@ -273,6 +307,35 @@ export function TablesPage() {
       <Grid templateColumns={{ base: '1fr', xl: '1.2fr .8fr' }} gap={5}>
         <Card>
           <CardBody>
+            <HStack mb={4} spacing={3} flexWrap="wrap">
+              <Button leftIcon={<LayoutGrid size={17} />} variant="ghost" onClick={alignGrid}>
+                Alinhar grade
+              </Button>
+              <Button leftIcon={<ListFilter size={17} />} variant="ghost" onClick={organizeByStatus}>
+                Organizar status
+              </Button>
+              <Select
+                maxW={{ base: '100%', md: '180px' }}
+                value={availabilityFilter}
+                onChange={(event) => setAvailabilityFilter(event.target.value as AvailabilityFilter)}
+              >
+                <option value="todas">Todas</option>
+                <option value="ativas">Ativas</option>
+                <option value="desativadas">Desativadas</option>
+                <option value="arquivadas">Arquivadas</option>
+              </Select>
+              <Select
+                maxW={{ base: '100%', md: '180px' }}
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as TableStatus | '')}
+              >
+                <option value="">Todos status</option>
+                {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+              </Select>
+              <Button leftIcon={<RotateCcw size={17} />} variant="ghost" onClick={clearFilters}>
+                Limpar
+              </Button>
+            </HStack>
             <Box
               ref={hallRef}
               position="relative"
@@ -286,7 +349,7 @@ export function TablesPage() {
               overflow="hidden"
               sx={{ touchAction: 'none' }}
             >
-              {tables.map((table) => (
+              {visibleTables.map((table) => (
                 <Box
                   key={table.id}
                   position="absolute"
@@ -318,9 +381,9 @@ export function TablesPage() {
           </CardBody>
         </Card>
         <SimpleGrid columns={{ base: 1, md: 2, xl: 1 }} spacing={4}>
-          {tables.length === 0 ? (
+          {visibleTables.length === 0 ? (
             <Card><CardBody><Text color="whiteAlpha.700">Nenhuma mesa cadastrada.</Text></CardBody></Card>
-          ) : tables.map((table) => (
+          ) : visibleTables.map((table) => (
             <Card key={table.id}>
               <CardBody>
                 <HStack justify="space-between" align="flex-start" flexWrap="wrap" gap={3}>
