@@ -17,6 +17,7 @@ import type {
   InventoryMovement,
   Order,
   Product,
+  RestaurantSettings,
   RestaurantTable,
   TabAccount
 } from '../types';
@@ -34,6 +35,7 @@ interface AppData {
   inventoryMovements: InventoryMovement[];
   cashOpen: boolean;
   notifications: AppNotification[];
+  settings: RestaurantSettings;
 }
 
 interface AppState extends AppData {
@@ -47,6 +49,7 @@ interface AppState extends AppData {
   setInventoryMovements: (items: InventoryMovement[]) => void;
   setCashOpen: (open: boolean) => void;
   setNotifications: (items: AppNotification[]) => void;
+  setSettings: (settings: RestaurantSettings) => void;
   resetDemoData: () => void;
 }
 
@@ -88,7 +91,13 @@ const initialData: AppData = {
   tabs: initialTabs,
   inventoryMovements: [],
   cashOpen: true,
-  notifications: []
+  notifications: [],
+  settings: {
+    restaurantName: 'GrillFlow Burger',
+    serviceTax: 10,
+    publicOrderBaseUrl: typeof window === 'undefined' ? '/mesa' : `${window.location.origin}/mesa`,
+    profileImage: ''
+  }
 };
 
 const AppStateContext = createContext<AppState | null>(null);
@@ -139,6 +148,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setData((current) => ({ ...current, inventoryMovements })),
       setCashOpen: (cashOpen) => setData((current) => ({ ...current, cashOpen })),
       setNotifications: (notifications) => setData((current) => ({ ...current, notifications })),
+      setSettings: (settings) => setData((current) => ({ ...current, settings })),
       resetDemoData: () => setData(initialData)
     }),
     [data]

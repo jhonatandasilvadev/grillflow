@@ -8,7 +8,6 @@ import {
   IconButton,
   Show,
   Text,
-  useColorMode,
   useToast,
   useDisclosure,
   Drawer,
@@ -20,7 +19,8 @@ import {
   PopoverContent,
   PopoverBody,
   Divider,
-  VStack
+  VStack,
+  Avatar
 } from '@chakra-ui/react';
 import {
   Banknote,
@@ -57,16 +57,20 @@ const navItems: Array<{ label: string; href: string; icon: LucideIcon }> = [
   { label: 'Configuracoes', href: '/admin/configuracoes', icon: Settings }
 ];
 
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function Sidebar({ onNavigate, restaurantName, profileImage }: { onNavigate?: () => void; restaurantName: string; profileImage: string }) {
   return (
     <VStack align="stretch" spacing={2} h="full">
       <HStack px={3} py={4} spacing={3}>
-        <Flex align="center" justify="center" boxSize="42px" borderRadius="14px" bg="brand.orange">
-          <Icon as={Utensils} boxSize={5} color="white" />
-        </Flex>
+        {profileImage ? (
+          <Avatar name={restaurantName} src={profileImage} boxSize="42px" borderRadius="14px" />
+        ) : (
+          <Flex align="center" justify="center" boxSize="42px" borderRadius="14px" bg="brand.orange">
+            <Icon as={Utensils} boxSize={5} color="white" />
+          </Flex>
+        )}
         <Box>
           <Text fontWeight={900} fontSize="lg">
-            GrillFlow
+            {restaurantName}
           </Text>
           <Text color="whiteAlpha.600" fontSize="xs" fontWeight={700}>
             Restaurant OS
@@ -100,11 +104,10 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AdminLayout() {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { setColorMode } = useColorMode();
   const toast = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const { orders, setOrders, notifications, setNotifications } = useAppState();
+  const { orders, setOrders, notifications, setNotifications, settings } = useAppState();
   const [soundEnabled, setSoundEnabled] = useState(localStorage.getItem(SOUND_ENABLED_KEY) === 'true');
   const notifiedOrders = useRef(new Set(notifications.map((notification) => notification.orderId)));
   const unread = notifications.filter((notification) => notification.status === 'unread');
@@ -180,14 +183,14 @@ export function AdminLayout() {
           borderColor="whiteAlpha.100"
           backdropFilter="blur(22px)"
         >
-          <Sidebar />
+          <Sidebar restaurantName={settings.restaurantName} profileImage={settings.profileImage} />
         </Box>
       </Show>
 
       <Drawer isOpen={isOpen} placement="left" onClose={onClose}>
         <DrawerOverlay />
         <DrawerContent bg="brand.bg" p={4}>
-          <Sidebar onNavigate={onClose} />
+          <Sidebar onNavigate={onClose} restaurantName={settings.restaurantName} profileImage={settings.profileImage} />
         </DrawerContent>
       </Drawer>
 
@@ -259,13 +262,10 @@ export function AdminLayout() {
               {location.pathname}
             </Text>
             <IconButton
-              aria-label="Tema escuro fixo"
+              aria-label="Abrir configuracoes"
               icon={<Settings />}
               variant="ghost"
-              onClick={() => {
-                setColorMode('dark');
-                toast({ title: 'Tema escuro premium fixo', status: 'info', duration: 1200 });
-              }}
+              onClick={() => navigate('/admin/configuracoes')}
             />
           </HStack>
         </Flex>

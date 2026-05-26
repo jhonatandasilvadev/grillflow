@@ -62,7 +62,7 @@ function emptyTable(): RestaurantTable {
 }
 
 export function TablesPage() {
-  const { tables, setTables, tabs, setTabs } = useAppState();
+  const { tables, setTables, tabs, setTabs, settings } = useAppState();
   const [draft, setDraft] = useState<RestaurantTable>(emptyTable);
   const [qrPreview, setQrPreview] = useState<{ table: RestaurantTable; image: string } | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function TablesPage() {
   const modal = useDisclosure();
   const qrModal = useDisclosure();
   const toast = useToast();
-  const publicBase = `${window.location.origin}/mesa`;
+  const publicBase = settings.publicOrderBaseUrl || `${window.location.origin}/mesa`;
 
   function saveTable() {
     if (!draft.name.trim()) return toast({ title: 'Nome da mesa obrigatorio', status: 'warning' });
@@ -104,7 +104,7 @@ export function TablesPage() {
       status: 'aberta' as const,
       orderIds: [],
       discount: 0,
-      serviceTax: 10,
+      serviceTax: settings.serviceTax,
       paymentMethod: 'pix' as const,
       createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     };

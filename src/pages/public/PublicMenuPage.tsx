@@ -38,7 +38,7 @@ function isValidCpf(value: string) {
 
 export function PublicMenuPage() {
   const { tableId } = useParams();
-  const { products, orders, setOrders, tables, tabs, setTabs, setTables } = useAppState();
+  const { products, orders, setOrders, tables, tabs, setTabs, setTables, settings } = useAppState();
   const table = tables.find((item) => item.id === tableId || tableQrSlug(item) === tableId);
   const sessionKey = `grillflow.public-command.${table ? tableQrSlug(table) : tableId}`;
   const storedCommandId = localStorage.getItem(sessionKey);
@@ -70,7 +70,7 @@ export function PublicMenuPage() {
       status: 'aberta',
       orderIds: [],
       discount: 0,
-      serviceTax: 10,
+      serviceTax: settings.serviceTax,
       paymentMethod: 'pix',
       createdAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       openedAt,
@@ -142,7 +142,7 @@ export function PublicMenuPage() {
       <Box minH="100vh" bg="brand.bg">
         <Box bgImage="linear-gradient(180deg, rgba(8,11,16,.18), #080b10 88%), url(https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1400&q=80)" bgSize="cover" bgPos="center" pt={8} pb={20}>
           <Container maxW="620px">
-            <Text color="brand.orange" fontWeight={900}>GrillFlow Burger</Text>
+            <Text color="brand.orange" fontWeight={900}>{settings.restaurantName}</Text>
             <Text mt={3} fontSize={{ base: '4xl', md: '5xl' }} fontWeight={900} lineHeight="1">Abrir comanda</Text>
             <Text mt={4} color="whiteAlpha.800">Informe seus dados para acessar o cardapio da {table.name}.</Text>
           </Container>
@@ -166,7 +166,7 @@ export function PublicMenuPage() {
     <Box minH="100vh" bg="brand.bg">
       <Box bgImage="linear-gradient(180deg, rgba(8,11,16,.18), #080b10 88%), url(https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=1400&q=80)" bgSize="cover" bgPos="center" pt={8} pb={20}>
         <Container maxW="760px">
-          <Text color="brand.orange" fontWeight={900}>GrillFlow Burger</Text>
+          <Text color="brand.orange" fontWeight={900}>{settings.restaurantName}</Text>
           <Text mt={3} fontSize={{ base: '4xl', md: '5xl' }} fontWeight={900} lineHeight="1">Cardapio da {table.name}</Text>
           <Text mt={4} color="whiteAlpha.800" maxW="520px">Comanda de {command.customerName ?? command.customer}. Escolha seus itens e envie para a cozinha.</Text>
           <HStack mt={6} wrap="wrap"><Button leftIcon={<Bell size={17} />} variant="ghost" bg="whiteAlpha.100" onClick={() => toast({ title: 'Garcom chamado', status: 'success' })}>Chamar garcom</Button><Button leftIcon={<ReceiptText size={17} />} variant="ghost" bg="whiteAlpha.100" onClick={() => toast({ title: 'Solicitacao de conta enviada', status: 'success' })}>Pedir conta</Button></HStack>

@@ -33,6 +33,13 @@ export interface Product {
   additions: string[];
 }
 
+export interface RestaurantSettings {
+  restaurantName: string;
+  serviceTax: number;
+  publicOrderBaseUrl: string;
+  profileImage: string;
+}
+
 export interface Order {
   id: string;
   number: string;

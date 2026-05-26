@@ -1,33 +1,79 @@
-import { Button, Card, CardBody, FormControl, FormLabel, HStack, Input, SimpleGrid, Switch, Text, VStack, useToast } from '@chakra-ui/react';
-import { Save } from 'lucide-react';
+import { Avatar, Button, Card, CardBody, FormControl, FormLabel, HStack, Input, SimpleGrid, Switch, Text, VStack, useToast } from '@chakra-ui/react';
+import { ImagePlus, Save } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { fileToImageDataUrl } from '../../lib/imageFiles';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { useAppState } from '../../state/AppState';
 import { PageHeader } from '../../ui/PageHeader';
 
 export function SettingsPage() {
-  const { resetDemoData } = useAppState();
+  const { resetDemoData, settings, setSettings } = useAppState();
+  const [draft, setDraft] = useState(settings);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toast = useToast();
+
+  function saveSettings() {
+    setSettings(draft);
+    toast({ title: 'Configuracoes salvas localmente', status: 'success' });
+  }
+
+  async function selectProfileImage(file?: File) {
+    if (!file) return;
+
+    try {
+      const image = await fileToImageDataUrl(file, { maxSize: 720, quality: 0.84 });
+      setDraft((current) => ({ ...current, profileImage: image }));
+      toast({ title: 'Foto carregada', status: 'success' });
+    } catch (error) {
+      toast({
+        title: 'Nao foi possivel carregar a foto',
+        description: error instanceof Error ? error.message : undefined,
+        status: 'error'
+      });
+    }
+  }
+
   return (
     <VStack align="stretch" spacing={6}>
       <PageHeader eyebrow="Configuracoes" title="Operacao, Supabase e experiencia">
-        <Button leftIcon={<Save size={17} />} onClick={() => toast({ title: 'Configuracoes salvas localmente', status: 'success' })}>Salvar</Button>
+        <Button leftIcon={<Save size={17} />} onClick={saveSettings}>Salvar</Button>
       </PageHeader>
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
         <Card>
           <CardBody>
             <Text fontWeight={900} fontSize="lg" mb={5}>Restaurante</Text>
             <VStack align="stretch" spacing={4}>
+              <HStack spacing={4} align="center">
+                <Avatar name={draft.restaurantName} src={draft.profileImage} size="xl" bg="brand.orange" />
+                <VStack align="flex-start" spacing={2}>
+                  <Button leftIcon={<ImagePlus size={17} />} variant="ghost" onClick={() => fileInputRef.current?.click()}>
+                    Alterar foto
+                  </Button>
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    display="none"
+                    onChange={(event) => selectProfileImage(event.target.files?.[0])}
+                  />
+                </VStack>
+              </HStack>
               <FormControl>
                 <FormLabel>Nome</FormLabel>
-                <Input defaultValue="GrillFlow Burger" />
+                <Input value={draft.restaurantName} onChange={(event) => setDraft({ ...draft, restaurantName: event.target.value })} />
               </FormControl>
               <FormControl>
                 <FormLabel>Taxa de servico</FormLabel>
-                <Input defaultValue="10%" />
+                <Input
+                  type="number"
+                  min={0}
+                  value={draft.serviceTax}
+                  onChange={(event) => setDraft({ ...draft, serviceTax: Number(event.target.value) || 0 })}
+                />
               </FormControl>
               <FormControl>
                 <FormLabel>Base URL QR Code</FormLabel>
-                <Input defaultValue={`${window.location.origin}/mesa`} />
+                <Input value={draft.publicOrderBaseUrl} onChange={(event) => setDraft({ ...draft, publicOrderBaseUrl: event.target.value })} />
               </FormControl>
             </VStack>
           </CardBody>

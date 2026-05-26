@@ -27,8 +27,9 @@ import {
   useToast
 } from '@chakra-ui/react';
 import { ImagePlus, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { currency } from '../../lib/format';
+import { fileToImageDataUrl } from '../../lib/imageFiles';
 import { usePersistedView } from '../../lib/usePersistedView';
 import { makeId, useAppState } from '../../state/AppState';
 import type { Product } from '../../types';
@@ -56,6 +57,7 @@ export function MenuPage() {
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [draft, setDraft] = useState<Product>(emptyProduct(categories[0]?.id ?? 'burgers'));
+  const productImageInputRef = useRef<HTMLInputElement | null>(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
 
@@ -93,11 +95,26 @@ export function MenuPage() {
     toast({ title: product.active ? 'Produto desativado' : 'Produto ativado', status: 'success' });
   }
 
+  async function selectProductImage(file?: File) {
+    if (!file) return;
+
+    try {
+      const image = await fileToImageDataUrl(file);
+      setDraft((current) => ({ ...current, image }));
+      toast({ title: 'Foto do produto carregada', status: 'success' });
+    } catch (error) {
+      toast({
+        title: 'Nao foi possivel carregar a imagem',
+        description: error instanceof Error ? error.message : undefined,
+        status: 'error'
+      });
+    }
+  }
+
   return (
     <VStack align="stretch" spacing={6}>
       <PageHeader eyebrow="Cardapio inteligente" title="Produtos, categorias e disponibilidade">
         <ViewToggle value={view} onChange={setView} />
-        <Button leftIcon={<ImagePlus size={17} />} variant="ghost" onClick={() => toast({ title: 'Informe uma URL de imagem ao editar o produto', status: 'info' })}>Upload</Button>
         <Button leftIcon={<Plus size={17} />} onClick={openNew}>Novo produto</Button>
       </PageHeader>
 
@@ -160,7 +177,22 @@ export function MenuPage() {
             <VStack align="stretch" spacing={4}>
               <FormControl isRequired><FormLabel>Nome</FormLabel><Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></FormControl>
               <HStack align="flex-start"><FormControl isRequired><FormLabel>Preco</FormLabel><NumberInput min={0} value={draft.price} onChange={(_, value) => setDraft({ ...draft, price: Number.isFinite(value) ? value : 0 })}><NumberInputField /></NumberInput></FormControl><FormControl><FormLabel>Categoria</FormLabel><Select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })}>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></FormControl></HStack>
-              <FormControl><FormLabel>Imagem URL</FormLabel><Input value={draft.image} onChange={(event) => setDraft({ ...draft, image: event.target.value })} /></FormControl>
+              <FormControl>
+                <FormLabel>Imagem do produto</FormLabel>
+                <HStack align="center" spacing={3}>
+                  <Image src={draft.image || fallbackImage} alt={draft.name || 'Produto'} boxSize="74px" borderRadius="12px" objectFit="cover" />
+                  <Button leftIcon={<ImagePlus size={17} />} variant="ghost" onClick={() => productImageInputRef.current?.click()}>
+                    Escolher foto do PC
+                  </Button>
+                  <Input
+                    ref={productImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    display="none"
+                    onChange={(event) => selectProductImage(event.target.files?.[0])}
+                  />
+                </HStack>
+              </FormControl>
               <FormControl><FormLabel>Descricao</FormLabel><Textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></FormControl>
             </VStack>
           </ModalBody>
